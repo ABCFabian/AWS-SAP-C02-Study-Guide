@@ -156,6 +156,7 @@ Note: The author makes no promises or guarantees on this guide as this is as sta
     * GLB: layer 3 (IP Protocol)
   * Use X-Forwarded-For header to see IPv4 address (V2)
   * 504 Error means gateway timed out, application not responding within the idle timeout period (attributed to DB or Web Server)
+    * Check X-Ray or Lambda Execution Time in CloudWatch Logs for example.
 
 #### Application Load Balancer (ALB):
   * Best suited for load balancing HTTP(s) traffic, operating @layer 7 (WebSockets)
@@ -357,6 +358,9 @@ Note: The author makes no promises or guarantees on this guide as this is as sta
   * AWS Direct Connect + VPN => encrypted
   * Dedicated: 1 GBps to 10 GBps
   * Hosted: 50 MBps, 500 MBps, up to 10 GBps
+  * Private virtual interface: A private virtual interface should be used to access an Amazon VPC using private IP addresses.
+  * Public virtual interface: A public virtual interface can access all AWS public services using public IP addresses.
+  * Transit virtual interface: A transit virtual interface should be used to access one or more Amazon VPC Transit Gateways associated with Direct Connect gateways. You can use transit virtual interfaces with 1/2/5/10 Gbps AWS Direct Connect connections.
 
 ### CIDR:
   * Used to provide an IP range
@@ -510,6 +514,12 @@ Note: The author makes no promises or guarantees on this guide as this is as sta
   * If non-root users are to have file access, modify the permissions accordingly via shell scripting
   * *By default, user data runs only during the boot cycle when the EC2 is first launched*
   * Alternatively, configuration(s) can be updated to ensure user data scripts and cloud-init directives can run every time an EC2 instance is restarted
+  * To run a script on every boot, you can place the script in the /var/lib/cloud/scripts/per-boot/ directory or change cloud init configuration.
+  ```shell
+  #cloud-config
+  cloud_final_modules:
+  - [scripts-user, always]
+   ```
 
 ### EC2 Hibernate:
   * In-memory state is preserved
@@ -1518,6 +1528,8 @@ graph LR
   * To increase efficiency, place objects in different prefixes, to avoid the upper limits and ideally increase rates via parallelism
   * Alternatively, to speed up downloads, one can utilize S3 Byte-Range Fetches in parallel
   * S3 Byte-Range Fetches can also be targeted to fetch the head of a file (eg headers)
+  *  can achieve at least 3,500 PUT/COPY/POST/DELETE or 5,500 GET/HEAD requests per second per prefix in a bucket.
+  *  if you have a file f1 stored in an S3 object path like so s3://your_bucket_name/folder1/sub_folder_1/f1, then /folder1/sub_folder_1/ becomes the prefix for file f1.
 
 ##### S3 Event Notifications
   * Event Notifications involve all CRUD operations (as many as required) and can be consumed by various services (eg: SNS, SQS, λ functions, etc.)
@@ -1572,6 +1584,7 @@ graph LR
   * Multi-AZ: 
     * Can be set at creation or live
     * Synchronous replication, at least 2 AZs in the region, while Read replicas => asynchronous replication can be in an AZ, cross-AZ or cross-region
+  * Asynchronous Replication: RDS read replicas are typically updated using asynchronous replication. This means that changes made to the primary database are propagated to the read replicas with a slight delay, known as replica lag. This lag can vary depending on the workload and network conditions.
 
 #### RDS Autoscaling:
   * Supports all RDS
@@ -1614,6 +1627,7 @@ graph LR
   * Automated failover with Aurora replicas 
     * Failover tiers: lowest ranking number first, then greatest size
   * Aurora ML: ML using SageMaker and Comprehend on Aurora
+  * Syncronised Replication: read replicas use a shared storage layer, which allows for synchronous replication. This ensures that the read replicas are always up-to-date with the primary instance, providing improved data durability and automatic failover.
 
 #### Amazon Redshift:
   * fully managed, scalable cloud data warehouse, columnar instead of row-based (no Multi-AZ, based on Postgres, No OLTP, but OLAP)
@@ -1629,6 +1643,7 @@ graph LR
   * Large inserts are better (S3 copy, firehose)
 
 #### Amazon Redshift Spectrum:
+  * Efficiently query and retrieve structured and semistructured data from files in Amazon S3 without having to load the data into Amazon Redshift tables.
   * Resides on dedicated Amazon Redshift servers independent of your cluster
   * Can efficiently query and retrieve structured and semistructured data from files in S3 into Redshift Cluster tables (points at S3) without loading data in Redshift tables
   * Pushes many compute intensive tasks such as predicate filtering and aggregation, down to the Redshift Spectrum layer
@@ -1826,6 +1841,8 @@ graph LR
     * On-demand: reliable, predictable, won't be terminated
     * Reserved: cost savings (EMR will be used if available)
     * Spot instances: cheaper, can be terminated, less reliable
+  * Apache Parquet and Apache ORC provide features that store data efficiently by employing column-wise compression, different encoding, compression based on data type, and predicate pushdown. They are also splittable. Generally, better compression ratios or skipping blocks of data means reading fewer bytes from Amazon S3, leading to better query performance. You can convert your existing data to Parquet or ORC using Spark or Hive on Amazon EMR.
+  *
 
 ### Amazon Sagemaker:
   * Fully managed service for development/data science to build ML models
@@ -1843,6 +1860,7 @@ graph LR
   * Commonly used with Amazon Quicksight
   * Use Cases: BI, analytics, reporting, analysis of VPC Flow Logs/ELB Logs, CloudTrail, etc.
   * Federated query allows SQL queries across relational, object, non-relational, and custom (AWS or on-premises) using Data Source Connectors that run on λ with results being returned and stored in S3
+
 
 ### S3/Glacier Select:
   * Simple SQL queries (no joins), though you may filter by rows and columns 
@@ -1871,14 +1889,19 @@ graph LR
   * Service to deploy applications as platform as a service (PAAS)
   * Automatically handles capacity provisioning load balancing, auto-scaling, and application health monitoring
   * Can manage OS, type of instances, DB(s), +/- AZ(s), HTTPS (for security) on load balancer, direct server log access without logging into application servers
+  * RDS DB instance to an Elastic Beanstalk environment is ideal for development and testing environments. However, it's not recommended for production environments because the lifecycle of the database instance is tied to the lifecycle of your application environment. If you terminate the environment, then you lose your data because the RDS DB instance is deleted by the environment. You have the option to decouple the database from your Elastic Beanstalk environment (by using the console or the configuration files) to move towards a configuration that offers greater flexibility. The decoupled database can remain operational as an external Amazon RDS database instance.
 
 ### AWS CloudFormation:
   * Service to allow modeling, provisioning, and managing AWS and 3rd party resources via IAC at the fine grained level via template
   * Writing in JSON or YAML
   * Template can't be used to deploy the same template across AWS accounts and regions
   * Can use CloudFormation Stack Designer to visualize the stack components and their relationships
+  * Template: A CloudFormation template is a JSON or YAML formatted text file. You can save these files with any extension, such as .json, .yaml, .template, or .txt. CloudFormation uses these templates as blueprints for building your AWS resources.
+  * Stack: When you use CloudFormation, you manage related resources as a single unit called a stack. You create, update, and delete a collection of resources by creating, updating, and deleting stacks. All the resources in a stack are defined by the stack's CloudFormation template.
+  * Change set: If you need to make changes to the running resources in a stack, you update the stack. Before making changes to your resources, you can generate a change set, which is a summary of your proposed changes. Change sets allow you to see how your changes might impact your running resources, especially for critical resources, before implementing them.
+  * Stack set: A stack set lets you create stacks in AWS accounts across regions by using a single CloudFormation template. All the resources included in each stack are defined by the stack set's CloudFormation template. As you create the stack set, you specify the template to use, in addition to any parameters and capabilities that the template requires.
   
-### AWS CloudFormation StackSets:
+### AWS CloudFormation Stack Sets:
   * Extends the functionality of stacks by enabling you to create, update, or delete stacks across multiple accounts and regions with a single operation
   * Done via Cloudformation template
   * Using an admin account of an 'AWS Org', you define and manage the AWS Cloudformation template, using the template as the basis for provisioning stacks into selected target accounts of an AWS Org across specified regions
