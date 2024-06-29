@@ -219,7 +219,7 @@ Note: The author makes no promises or guarantees on this guide as this is as sta
     * Doesn't work with simple routing policy
     * HC that monitors an endpoint (application, server, other AWS resource)
     * HC that monitors other health check(s) or combination of them (Calculated HC)
-      * Can use use OR, AND, NOT
+      * Can use OR, AND, NOT
       * Can monitor up to 256 Child HC(s)
       * Specify how many must pass to make parent HC pass
   * HC that monitors Cloudwatch Alarms from Cloudwatch metrics (helpful for VPC private resources as VPC inaccessible endpoint to HC)
@@ -271,6 +271,8 @@ Note: The author makes no promises or guarantees on this guide as this is as sta
   * On-premises:
     * *Route 53 Resolver can conditionally forward queries to resolvers on the on-premises network via an **outbound endpoint ONLY**, not an inbound endpoint to resolve to on-premises infrastructure*
     * To conditionally forward queries, you need to create Resolver rules that specify the domain names for the DNS queries that you want to forward and the IPs of the DNS resolvers on the on-premises network that you want to forward the queries to
+  * The Resolver additionally contains endpoints that you configure to answer DNS queries to and from your on-premises environment. Before you start to forward queries, you create Resolver inbound and/or outbound endpoints in the connected VPC. These endpoints provide a path for inbound or outbound queries.
+  * When you create a VPC, the Route 53 Resolver that is created by default, maps to a DNS server that runs on a reserved IP address for the VPC network range, plus 2. For example, the DNS Server on a 10.0.0.0/16 network is located at 10.0.0.2. 
 
 ### Route 53 Records:
   * Each record contains:
@@ -344,7 +346,7 @@ Note: The author makes no promises or guarantees on this guide as this is as sta
   * Allows exposure of VPC service to tens, hundreds, or thousands of other VPCs
   * Doesn't require VPC peering; no route tables, NAT, IGWs, etc.
   * Requires a NLB on the service VPC and an ENI on the customer VPC
-  * If issue(s): Check DNS setting Resolution in VPC and/or check the the Route Tables
+  * If issue(s): Check DNS setting Resolution in VPC and/or check the Route Tables
 
 ### AWS Direct Connect
   * Service that makes it easy to establish a dedicated network connection from on-premises to AWS VPC.  
@@ -622,6 +624,7 @@ Note: The author makes no promises or guarantees on this guide as this is as sta
 ### λ:
   * Serverless backend capable of supporting container image (must implement λ Runtime API)
   * Free tier => 1,000,000 requests and 400,000 GBs of compute time
+    * GB-seconds is a core metric used for billing Lambda functions. It's calculated by multiplying the amount of memory allocated to a function by its execution time in seconds.
   * Pay .20 per 1,000,000 requests after free threshold
   * Pay per duration of memory (in increments of 1 ms) after the free threshold ($1.00 for 600,000 GBs)
   * Up to 10 GB of RAM, minimum 128 MB
@@ -1110,6 +1113,8 @@ flowchart TD
   * Best to stop the root EBS device from taking snapshots, though you don't have to
   * Provisioned IOPS (PIOPS [io1/io2])=> DB workloads/multi-attach
   * Multi-attach (EC2 =>rd/wr)=>attach the same EBS to multiple EC2 in the same AZ; up to 16 (all in the same AZ)
+    * Linux instances support Multi-Attach enabled io1 and io2 volumes. Windows instances support Multi-Attach enabled io2 volumes only.
+    * Must be based on Nitro System 
   * Can change volume size and storage type on the fly
   * Always in the same region as EC2
   * To move EC2 volume=>snapshot=>AMI=>copy to destination Region/AZ=>launch AMI
@@ -1412,6 +1417,42 @@ harsh environments
     * Create an IAM Role with kms:Decrypt for the source KMS Key and kms:Encrypt for the target KMS key
   * Per CRR, can utilize multi-region AWS KMS Keys, but are currently treated as independent keys by S3 (eg: upon transfer, the object will still be decrypted and encrypted)
 
+##### S3 Replication Time Control (S3 RTC)
+
+* Guaranteed Replication Time: Ensures that 99.99% of objects are replicated within 15 minutes.
+* Monitoring and Metrics: Provides metrics to monitor the total number and size of objects pending replication and the maximum replication time to the destination region.
+* Compliance: Helps meet compliance requirements by providing an SLA for replication times.
+* Example Replication Configuration
+```json
+{
+  "Role": "arn:aws:iam::source-account-id:role/replication-role",
+  "Rules": [
+    {
+      "Status": "Enabled",
+      "Filter": {
+        "Tag": {
+          "Key": "your-tag-key",
+          "Value": "your-tag-value"
+        }
+      },
+      "DeleteMarkerReplication": { "Status": "Disabled" },
+      "Destination": {
+        "Bucket": "arn:aws:s3:::destination-bucket",
+        "Metrics": {
+          "Status": "Enabled",
+          "EventThreshold": { "Minutes": 15 }
+        },
+        "ReplicationTime": {
+          "Status": "Enabled",
+          "Time": { "Minutes": 15 }
+        }
+      },
+      "Priority": 1
+    }
+  ]
+}
+```
+
 ##### S3 Batch Replication:
   * Provides a way to replicate objects that existed before a replication configuration was in place, objects that have previously been replicated, and those that failed replication
   * Differs from live replication
@@ -1606,7 +1647,7 @@ graph LR
   * Supports RDS (MySql, Postgres, MariaDB) and aurora (MySql/Postgres)
   * No code changes required for most applications
   * Enforce IAM authorization for DB and securely store credentials in AWS Secrets Manager
-  * RDS Prosy is never publicly accessible (must be accessed via VPC)
+  * RDS Proxy is never publicly accessible (must be accessed via VPC)
 
 #### Aurora:
   * MySQL or Postgres
@@ -1695,6 +1736,10 @@ graph LR
   * Can be exported to S3 as DynamoDB JSON or ion format
   * Can be imported from S3 as CSV, DynamoDB JSON, or ion format
 
+#### DynamodDB Streams
+
+* DynamoDB Streams captures a time-ordered sequence of item-level modifications in any DynamoDB table and stores this information in a log for up to 24 hours. Applications can access this log and view the data items as they appeared before and after they were modified, in near-real time.
+
 #### DynamoDB Global Tables:
   * Makes a DynamoDB table accessible with low latency in multiple regions
   * Active-Active replication
@@ -1705,7 +1750,7 @@ graph LR
 #### DynamoDB Accelerator (DAX):
   * Fully managed, highly available, in-memory cache with microsecond latency
   * Up to 10x performance improvement, without application logic change(s)
-  * 5 minute TTL (default)
+  * 5 minutes TTL (default)
   * Reduces request time from milliseconds to microseconds
   * Best and easiest option to improve DynamoDB performance 
   * If asked about NoSQL with in-memory caching => DAX
@@ -1739,8 +1784,8 @@ graph LR
     * Elastic Search service
     * Kinesis Data Streams
     * DocumentDB
-  * Homogenous migration: Oracle => Oracle
-  * Heterogeneous: Oracle => Aurora
+  * Homogenous migration: e.g. Oracle => Oracle
+  * Heterogeneous: e.g. Oracle => Aurora
   * EC2 server runs replication software, as well as continuous data replication using Change Data Capture (CDC) [for new deltas] and DMS 
   * Can pre-create target tables manually or use AWS Schema Conversion Tool (SCT) [runs on the same server] to create some/all of the target tables, indices, views, etc. (only necessary for heterogeneous case)
 
@@ -1842,13 +1887,12 @@ graph LR
     * Reserved: cost savings (EMR will be used if available)
     * Spot instances: cheaper, can be terminated, less reliable
   * Apache Parquet and Apache ORC provide features that store data efficiently by employing column-wise compression, different encoding, compression based on data type, and predicate pushdown. They are also splittable. Generally, better compression ratios or skipping blocks of data means reading fewer bytes from Amazon S3, leading to better query performance. You can convert your existing data to Parquet or ORC using Spark or Hive on Amazon EMR.
-  *
 
 ### Amazon Sagemaker:
   * Fully managed service for development/data science to build ML models
   * Typically, difficult to do all the processes in one place and provision server(s)
     * label data
-    * train and tunde model(s)
+    * train and tune model(s)
     * serve API traffic against the model(s)
     
 ### Amazon Athena:
@@ -1873,7 +1917,8 @@ graph LR
   * Column-Level security (CLS)
   * Can share analysis (if published) or the dashboard (read-only) with users or groups
 
-### Amazon Managed Grafana - Managed service of data visualizations to analyze, monitor, set alarms on metrics, logs and traces across multiple data sources.  These features can be integrated into shareable dashboards
+### Amazon Managed Grafana
+* Managed service of data visualizations to analyze, monitor, set alarms on metrics, logs and traces across multiple data sources.  These features can be integrated into shareable dashboards
     
 ## Infrastructure as Code (IAC) / Platform as a Service (PAAS)
 
@@ -2112,13 +2157,17 @@ sequenceDiagram
   * Rely on EBS/instance store for disk space
   * Advantage over λ=>time limit, limited runtimes, limited disk space
 
-### AWS Wavelength: extend VPC and its resources via desired subnets to include a wavelength zone, embedding within 5G networks providing ultra-low latency
+### AWS Wavelength
+* extend VPC and its resources via desired subnets to include a wavelength zone, embedding within 5G networks providing ultra-low latency
 
-### AWS Data Exchange: service in AWS for customers to find, subscribe to, and use third-party data in the AWS Cloud
+### AWS Data Exchange
+* service in AWS for customers to find, subscribe to, and use third-party data in the AWS Cloud
 
-### AWS Serverless Application Repository: managed repository with AWS for serverless applications allowing for storage/sharing that doesn't need to be cloned, built, packaged, published to AWS
+### AWS Serverless Application Repository
+* managed repository with AWS for serverless applications allowing for storage/sharing that doesn't need to be cloned, built, packaged, published to AWS
 
-### AWS Elastic Transcoder: highly scalable/cost-efficient service to convert (or 'transcode') media files (video/audio) to format(s) that will be playable on devices, tablets, desktops, etc. The transaction takes place between a source and destination S3 bucket.  
+### AWS Elastic Transcoder
+* highly scalable/cost-efficient service to convert (or 'transcode') media files (video/audio) to format(s) that will be playable on devices, tablets, desktops, etc. The transaction takes place between a source and destination S3 bucket.  
 
 ### Amazon Personalize:
   * Fully managed ML service to build real-time personalized recommendations applications
@@ -2129,7 +2178,8 @@ sequenceDiagram
   * Serverless NLP service harnessing ML to uncover valuable insights and connections in text
   * Medical version detects PHI via DetectPHI API
 
-### Amazon Outposts: Pool of AWS compute and storage resources deployed at a customer site and is essentially part of an AWS region including:
+### Amazon Outposts
+* Pool of AWS compute and storage resources deployed at a customer site and is essentially part of an AWS region including:
   * VPC
   * EC2
   * ECS/EKS
