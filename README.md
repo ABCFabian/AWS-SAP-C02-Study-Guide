@@ -121,6 +121,26 @@ Note: The author makes no promises or guarantees on this guide as this is as sta
     * Route 53 Resolver Rules
     * Licence Manager Configurations across accounts using Private IP(s)
 
+### AWS SSO
+
+* establish user federation across multiple AWS accounts.
+* leverage your existing corporate or a third-party IdP.
+
+### AWS Simple AD
+
+* Simple AD is a Microsoft AD-compatible directory that provides basic AD features such as managing user accounts, group memberships, and group policies, joining a (Linux or Windows) EC2 instance to your directory, and Kerberos-based SSO.
+* Standalone directory running on AWS
+
+### AD Connector
+
+* proxy that sends request to on-prem AD
+
+### Managed Microsoft AD
+
+* Runs MS AD as a managed service on AWS.
+* two Domain Controller in different AZs
+* if you need to make a replica of on-prem AD a EC2 instances with AD deployment is needed
+
 ## Networking
 
 ### API Gateway:
@@ -1951,6 +1971,9 @@ graph LR
   * Done via Cloudformation template
   * Using an admin account of an 'AWS Org', you define and manage the AWS Cloudformation template, using the template as the basis for provisioning stacks into selected target accounts of an AWS Org across specified regions
   * Don't confuse with Cloudformation stacks which is a set of resources created and managed as a single unit from a Cloud formation template and can't be used across accounts or regions
+
+### AWS CloudFormation Nested Stack
+  * Nested stacks are stacks created as part of other stacks. You create a nested stack within another stack by using the AWS::CloudFormation::Stack resource. As your infrastructure grows, common patterns can emerge in which you declare the same components in multiple templates. You can separate out these common components and create dedicated templates for them. Then use the resource in your template to reference other templates, creating nested stacks.
 
 ### AWS CodeDeploy:
   * Fully managed deployment service to automate software deployments on compute service (EC2/Fargate/λ/on-premises)
