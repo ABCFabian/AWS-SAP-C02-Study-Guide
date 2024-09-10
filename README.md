@@ -641,7 +641,7 @@ Note: The author makes no promises or guarantees on this guide as this is as sta
   * Need to specify storage class on EKS cluster, leveraging Container Storage Interface (CSI) compliant driver: EBS, EFS (Fargate), FSx for Lustre/for NetApp ON TAP
   * Doesn't support λ, does support Fargate, Managed Node Groups, and Self-Managed Nodes
   
-### λ:
+### Lambda λ:
   * Serverless backend capable of supporting container image (must implement λ Runtime API)
   * Free tier => 1,000,000 requests and 400,000 GBs of compute time
     * GB-seconds is a core metric used for billing Lambda functions. It's calculated by multiplying the amount of memory allocated to a function by its execution time in seconds.
@@ -1258,10 +1258,8 @@ flowchart TD
   * Alternative to moving data over the network (and paying network fees)
   * Pay per data transfer job
   * Provide block storage and Amazon S3-compatible object storage
-  * Snowball Edge Storage Optimized
-  * 80 TB of HDD capacity for block volume and S3 compatible object storage
-  * Snowball Edge Compute Optimized
-  * 42 TB of HDD capacity for block volume and S3 compatible object storage
+  * Snowball Edge Storage Optimized 80 TB of HDD capacity for block volume and S3 compatible object storage
+  * Snowball Edge Compute Optimized 42 TB of HDD capacity for block volume and S3 compatible object storage
   * Usecases: large data cloud migrations, decommission, disaster recovery
 
 ### AWS Snowcone
